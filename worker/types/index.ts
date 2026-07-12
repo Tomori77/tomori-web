@@ -3,6 +3,7 @@ export interface Env {
   DB: D1Database
   MEDIA_BUCKET: R2Bucket
   JWT_SECRET?: string
+  SUPER_ADMIN_EMAIL?: string
 }
 
 export type AppContext = {

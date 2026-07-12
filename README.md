@@ -42,7 +42,24 @@ npm run dev
 wrangler secret put JWT_SECRET
 ```
 
-本地也可以在 `.dev.vars` 中写入 `JWT_SECRET=...`。超级管理员账户需要在 D1 中将指定用户的 `role` 手动设为 `4`。
+本地也可以在 `.dev.vars` 中写入 `JWT_SECRET=...` 和 `SUPER_ADMIN_EMAIL=...`。
+
+### Cloudflare 控制台配置超级管理员
+
+在 Cloudflare Dashboard 中打开 `Workers & Pages`，进入 `tomori-web`，然后打开 `Settings` → `Variables and Secrets`。新增一个明文变量：
+
+```text
+变量名：SUPER_ADMIN_EMAIL
+变量值：你的管理员邮箱
+```
+
+同时确认 `JWT_SECRET` 已作为 Secret 配置。保存并部署后，使用该邮箱注册的新用户会自动获得 `role=4` 超级管理员权限；邮箱比较会忽略首尾空格和大小写。
+
+该规则只对注册时生效，不会自动修改已经存在的同邮箱用户。若该邮箱已经注册，需要在 D1 中执行一次：
+
+```bash
+npx wrangler d1 execute tomori-web-db --remote --command "UPDATE users SET role = 4, updated_at = datetime('now') WHERE email = '你的管理员邮箱';"
+```
 
 ## 阶段 5 状态
 

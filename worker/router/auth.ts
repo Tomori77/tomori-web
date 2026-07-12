@@ -45,9 +45,10 @@ authRoutes.post('/register', async (c) => {
   if (existing) return c.json({ error: existing.username === username ? 'Username is already in use' : 'Email is already in use' }, 409)
 
   const passwordHash = hashSync(password, 12)
+  const role = c.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase() === email ? 4 : 1
   const result = await c.env.DB.prepare(
-    'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)'
-  ).bind(username, email, passwordHash).run()
+    'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)'
+  ).bind(username, email, passwordHash, role).run()
   const user = await c.env.DB.prepare(
     'SELECT id, username, email, role, avatar_url, bio FROM users WHERE id = ?'
   ).bind(result.meta.last_row_id).first<AuthUser>()

@@ -2,3 +2,9 @@ node_modules/
 .wrangler/
 .dev.vars
 dist/
+AGENTS.md
+DESIGN.md
+DEVELOPMENT_ORDER.md
+DEVELOPMENT.md
+KNOWLEDGE.md
+key.md
