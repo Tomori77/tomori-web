@@ -1,16 +1,17 @@
 const routes = [
-  { pattern: /^\/$/, render: () => import('./pages/home.js') },
-  { pattern: /^\/login\/?$/, render: () => import('./pages/login.js') },
-  { pattern: /^\/register\/?$/, render: () => import('./pages/register.js') },
-  { pattern: /^\/tools\/?$/, render: () => import('./pages/tools.js') },
-  { pattern: /^\/profile\/?$/, render: () => import('./pages/profile.js') },
-  { pattern: /^\/my-posts\/?$/, render: () => import('./pages/myPosts.js') },
-  { pattern: /^\/editor(?:\/[^/]+)?\/?$/, render: () => import('./pages/editor.js') },
-  { pattern: /^\/admin(?:\/.*)?\/?$/, render: () => import('./pages/admin.js') }
+  { pattern: /^\/$/, render: () => import('./pages/home.js'), auth: 0 },
+  { pattern: /^\/article\/[^/]+\/?$/, render: () => import('./pages/article.js'), auth: 0 },
+  { pattern: /^\/login\/?$/, render: () => import('./pages/login.js'), auth: 0 },
+  { pattern: /^\/register\/?$/, render: () => import('./pages/register.js'), auth: 0 },
+  { pattern: /^\/tools(?:\/[^/]+)?\/?$/, render: () => import('./pages/tools.js'), auth: 0 },
+  { pattern: /^\/profile\/?$/, render: () => import('./pages/profile.js'), auth: 1 },
+  { pattern: /^\/my-posts\/?$/, render: () => import('./pages/myPosts.js'), auth: 1 },
+  { pattern: /^\/editor(?:\/[^/]+)?\/?$/, render: () => import('./pages/editor.js'), auth: 2 },
+  { pattern: /^\/admin(?:\/.*)?\/?$/, render: () => import('./pages/admin.js'), auth: 3 }
 ]
 
 export async function resolve(pathname) {
   const route = routes.find(({ pattern }) => pattern.test(pathname))
-  if (!route) return (await import('./pages/notFound.js')).render
-  return (await route.render()).render
+  if (!route) return { render: (await import('./pages/notFound.js')).render, auth: 0 }
+  return { render: (await route.render()).render, auth: route.auth }
 }
