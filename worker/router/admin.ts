@@ -4,6 +4,27 @@ import type { AppContext } from '../types'
 
 const admin = new Hono<AppContext>()
 
+admin.get('/articles/all', async (c) => {
+  const result = await c.env.DB.prepare(
+    `SELECT a.id, a.title, a.slug, a.status, a.visibility, a.tags,
+            a.section_id, s.name AS section_name, s.slug AS section_slug,
+            a.author_id, u.username AS author_username,
+            a.rejected_reason, a.created_at, a.updated_at
+     FROM articles a
+     LEFT JOIN sections s ON s.id = a.section_id
+     LEFT JOIN users u ON u.id = a.author_id
+     ORDER BY COALESCE(s.name, '未分类') COLLATE NOCASE, u.username COLLATE NOCASE, a.updated_at DESC`
+  ).all()
+  return c.json({
+    articles: result.results.map((article) => ({
+      ...article,
+      tags: (() => {
+        try { return JSON.parse(String(article.tags || '[]')) } catch { return [] }
+      })()
+    }))
+  })
+})
+
 admin.get('/users', async (c) => {
   const search = (c.req.query('search') || '').trim()
   const limit = Math.min(Math.max(Number(c.req.query('limit') || 20), 1), 100)

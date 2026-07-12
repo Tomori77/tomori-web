@@ -1,9 +1,17 @@
 import { resolve } from './router.js'
 import { api, clearSession, getUser, loadSession, setSession, setUser } from './auth.js'
+import { renderMarkdown } from './markdown.js'
 
 const app = document.querySelector('#app')
 const nav = document.querySelector('.site-nav')
 const menuToggle = document.querySelector('.menu-toggle')
+const routeLoading = document.querySelector('#route-loading')
+let renderVersion = 0
+
+function setLoading(visible) {
+  if (!routeLoading) return
+  routeLoading.hidden = !visible
+}
 
 function navigate(path) {
   window.history.pushState({}, '', path)
@@ -18,8 +26,10 @@ function escapeHtml(value) {
 async function updateNavigation(user) {
   let navItems = [{ label: '首页', path: '/' }, { label: '文章', path: '/articles' }, { label: '工具', path: '/tools' }]
   try {
-    navItems = (await api('/settings/nav_items')).nav_items
+    const configuredItems = (await api('/settings/nav_items')).nav_items
       .filter((item) => item && typeof item.label === 'string' && typeof item.path === 'string' && item.path.startsWith('/') && !item.path.startsWith('//'))
+    const defaults = [{ label: '文章', path: '/articles', icon: 'book' }]
+    navItems = [...configuredItems, ...defaults.filter((item) => !configuredItems.some((configured) => configured.path === item.path))]
   } catch {
     // Keep the built-in navigation when settings are unavailable.
   }
@@ -43,20 +53,36 @@ function closeMenu() {
 }
 
 async function render() {
-  const route = await resolve(window.location.pathname)
-  const user = getUser()
-  if (route.auth && (!user || user.role < route.auth)) {
-    sessionStorage.setItem('tomori_redirect', window.location.pathname)
-    navigate(route.auth >= 3 && user ? '/' : '/login')
-    return
+  const version = ++renderVersion
+  const path = window.location.pathname
+  let loadingTimer
+  loadingTimer = window.setTimeout(() => setLoading(true), 150)
+
+  try {
+    const route = await resolve(path)
+    const user = getUser()
+    if (version !== renderVersion) return
+    if (route.auth && (!user || user.role < route.auth)) {
+      sessionStorage.setItem('tomori_redirect', path)
+      navigate(route.auth >= 3 && user ? '/' : '/login')
+      return
+    }
+
+    // Keep the current page visible until all new page data and navigation are ready.
+    const html = await route.render()
+    await updateNavigation(user)
+    if (version !== renderVersion) return
+
+    app.innerHTML = `<div class="page-enter">${html}</div>`
+    app.focus({ preventScroll: true })
+    document.querySelectorAll('[data-link]').forEach((link) => {
+      link.setAttribute('aria-current', link.getAttribute('href') === window.location.pathname ? 'page' : 'false')
+    })
+    bindPageActions()
+  } finally {
+    window.clearTimeout(loadingTimer)
+    if (version === renderVersion) setLoading(false)
   }
-  app.innerHTML = `<div class="page-enter">${await route.render()}</div>`
-  app.focus({ preventScroll: true })
-  await updateNavigation(user)
-  document.querySelectorAll('[data-link]').forEach((link) => {
-    link.setAttribute('aria-current', link.getAttribute('href') === window.location.pathname ? 'page' : 'false')
-  })
-  bindPageActions()
 }
 
 function showFormError(message) {
@@ -112,12 +138,7 @@ async function bindPageActions() {
     const contentField = articleForm.querySelector('[name="content"]')
     const updatePreview = () => {
       if (!preview || !contentField) return
-      const safe = String(contentField.value)
-        .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-        .replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^# (.+)$/gm, '<h1>$1</h1>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>')
-        .replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>')
-      preview.innerHTML = safe ? `<p>${safe}</p>` : '<p class="preview-empty">开始输入，右侧会显示预览。</p>'
+      preview.innerHTML = renderMarkdown(contentField.value) || '<p class="preview-empty">开始输入，右侧会显示预览。</p>'
     }
     contentField?.addEventListener('input', updatePreview)
     updatePreview()
@@ -257,7 +278,7 @@ async function bindPageActions() {
 
   document.querySelectorAll('[data-section-delete]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!window.confirm('删除板块后，文章会变为未分类。确定继续吗？')) return
+      if (!window.confirm('确定删除这个空板块吗？含有文章的板块不可删除。')) return
       try {
         await api(`/sections/${button.dataset.sectionDelete}`, { method: 'DELETE' })
         render()

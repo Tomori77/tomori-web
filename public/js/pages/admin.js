@@ -14,6 +14,7 @@ async function loadAdmin() {
     if (section === 'users') return renderUsers()
     if (section === 'tools') return renderTools()
     if (section === 'sections') return renderSections()
+    if (section === 'articles') return renderAllArticles()
     if (section === 'logs') return renderLogs()
     if (section === 'settings') return renderSettings()
     if (section === 'dashboard') return renderDashboard()
@@ -26,7 +27,7 @@ async function loadAdmin() {
 }
 
 function layout(title, description, content) {
-  return `<div class="admin-layout"><aside class="admin-sidebar"><p class="eyebrow">Control room</p><nav aria-label="管理后台导航"><a href="/admin" data-link>仪表盘</a><a href="/admin/review" data-link>文章审核</a><a href="/admin/sections" data-link>板块管理</a><a href="/admin/users" data-link>用户管理</a><a href="/admin/tools" data-link>工具管理</a><a href="/admin/logs" data-link>操作日志</a><a href="/admin/settings" data-link>系统设置</a></nav></aside><section class="admin-main"><div class="section-heading"><p class="eyebrow">Control room</p><h2>${title}</h2><p>${description}</p></div>${content}</section></div>`
+  return `<div class="admin-layout"><aside class="admin-sidebar"><p class="eyebrow">Control room</p><nav aria-label="管理后台导航"><a href="/admin" data-link>仪表盘</a><a href="/admin/articles" data-link>全部文章</a><a href="/admin/review" data-link>文章审核</a><a href="/admin/sections" data-link>板块管理</a><a href="/admin/users" data-link>用户管理</a><a href="/admin/tools" data-link>工具管理</a><a href="/admin/logs" data-link>操作日志</a><a href="/admin/settings" data-link>系统设置</a></nav></aside><section class="admin-main"><div class="section-heading"><p class="eyebrow">Control room</p><h2>${title}</h2><p>${description}</p></div>${content}</section></div>`
 }
 
 async function renderDashboard() {
@@ -49,8 +50,23 @@ async function renderTools() {
 
 async function renderSections() {
   const sections = (await api('/sections')).sections
-  const cards = sections.map((section) => `<article class="glass-card admin-row"><div><small>SECTION #${section.id}</small><h3>${escapeHtml(section.name)}</h3><p>${escapeHtml(section.description || '')} · ${section.article_count} 篇文章</p></div><div class="actions"><button class="button button-glass" data-section-edit="${section.id}" data-section-name="${escapeHtml(section.name)}" data-section-description="${escapeHtml(section.description || '')}">编辑</button><button class="button button-glass" data-section-delete="${section.id}">删除</button></div></article>`).join('')
+  const cards = sections.map((section) => `<article class="glass-card admin-row"><div><small>SECTION #${section.id}</small><h3>${escapeHtml(section.name)}</h3><p>${escapeHtml(section.description || '')} · ${section.article_count} 篇文章</p></div><div class="actions"><button class="button button-glass" data-section-edit="${section.id}" data-section-name="${escapeHtml(section.name)}" data-section-description="${escapeHtml(section.description || '')}">编辑</button>${Number(section.article_count) === 0 ? `<button class="button button-glass" data-section-delete="${section.id}">删除</button>` : '<small class="delete-disabled">含有文章，不可删除</small>'}</div></article>`).join('')
   return layout('板块管理', '创建独立板块，文章可以归属到对应板块。', `<section class="glass-card editor-card" data-section-form><label for="section-name">名称</label><input id="section-name" name="name" maxlength="80" required><label for="section-description">描述</label><input id="section-description" name="description" maxlength="300"><button class="button button-primary" type="button" data-section-save>添加板块</button><p class="form-status" data-form-status></p></section><section class="admin-list">${cards || '<div class="glass-card empty-state"><p>暂无板块。</p></div>'}</section>`)
+}
+
+async function renderAllArticles() {
+  const articles = (await api('/admin/articles/all')).articles
+  const groupedSections = new Map()
+  for (const article of articles) {
+    const sectionName = article.section_name || '未分类'
+    if (!groupedSections.has(sectionName)) groupedSections.set(sectionName, new Map())
+    const authors = groupedSections.get(sectionName)
+    const authorName = article.author_username || '未知作者'
+    if (!authors.has(authorName)) authors.set(authorName, [])
+    authors.get(authorName).push(article)
+  }
+  const content = [...groupedSections.entries()].map(([sectionName, authors]) => `<details class="article-group"><summary>${escapeHtml(sectionName)} <span>${[...authors.values()].flat().length}</span></summary><div class="article-group-body">${[...authors.entries()].map(([authorName, authorArticles]) => `<details class="author-group"><summary>${escapeHtml(authorName)} <span>${authorArticles.length}</span></summary><div class="admin-list">${authorArticles.map((article) => `<a class="glass-card admin-row" href="/article/${encodeURIComponent(article.slug)}" data-link><div><h3>${escapeHtml(article.title)}</h3><p>${escapeHtml(article.status)} · ${(Array.isArray(article.tags) ? article.tags : []).map((tag) => `#${escapeHtml(tag)}`).join(' ')}</p></div><small>${escapeHtml(article.updated_at)}</small></a>`).join('')}</div></details>`).join('')}</div></details>`).join('') || '<div class="glass-card empty-state"><p>暂无文章。</p></div>'
+  return layout('全部文章', '按板块和发布人浏览全部文章，分类默认折叠。', `<section class="article-groups">${content}</section>`)
 }
 
 async function renderLogs() {

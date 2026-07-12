@@ -32,6 +32,7 @@ npm run dev
 - `/api/admin/users`、`/api/admin/logs`、`/api/admin/stats`、`/api/admin/settings` 提供管理后台数据接口。
 - `/api/admin/users` 支持搜索、封禁和超级管理员角色调整；`/api/admin/logs` 及 `/api/admin/settings` 需要超级管理员权限。
 - `/admin`、`/admin/dashboard`、`/admin/users`、`/admin/tools`、`/admin/logs`、`/admin/settings` 对应管理后台页面；工具使用 sandbox iframe 隔离运行。
+- `/admin/articles` 显示全部文章，按板块和发布人分组，分类默认折叠；含有文章的板块不可删除。
 - `/api/pages` 仍是后续自定义页面功能的占位路由；`/api/admin/*` 已要求管理员权限。
 
 ## Cloudflare 资源
