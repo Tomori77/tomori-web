@@ -9,10 +9,11 @@ export function render() {
 }
 
 async function loadAdmin() {
-  const section = window.location.pathname.split('/')[2] || 'review'
+  const section = window.location.pathname.split('/')[2] || 'dashboard'
   try {
     if (section === 'users') return renderUsers()
     if (section === 'tools') return renderTools()
+    if (section === 'sections') return renderSections()
     if (section === 'logs') return renderLogs()
     if (section === 'settings') return renderSettings()
     if (section === 'dashboard') return renderDashboard()
@@ -25,7 +26,7 @@ async function loadAdmin() {
 }
 
 function layout(title, description, content) {
-  return `<section class="section-heading"><p class="eyebrow">Control room</p><h2>${title}</h2><p>${description}</p><div class="admin-tabs"><a href="/admin" data-link>审核</a><a href="/admin/dashboard" data-link>仪表盘</a><a href="/admin/users" data-link>用户</a><a href="/admin/tools" data-link>工具</a><a href="/admin/logs" data-link>日志</a><a href="/admin/settings" data-link>设置</a></div></section>${content}`
+  return `<div class="admin-layout"><aside class="admin-sidebar"><p class="eyebrow">Control room</p><nav aria-label="管理后台导航"><a href="/admin" data-link>仪表盘</a><a href="/admin/review" data-link>文章审核</a><a href="/admin/sections" data-link>板块管理</a><a href="/admin/users" data-link>用户管理</a><a href="/admin/tools" data-link>工具管理</a><a href="/admin/logs" data-link>操作日志</a><a href="/admin/settings" data-link>系统设置</a></nav></aside><section class="admin-main"><div class="section-heading"><p class="eyebrow">Control room</p><h2>${title}</h2><p>${description}</p></div>${content}</section></div>`
 }
 
 async function renderDashboard() {
@@ -44,6 +45,12 @@ async function renderTools() {
   const tools = (await api('/tools')).tools
   const cards = tools.map((tool) => `<article class="glass-card admin-row"><div><small>TOOL #${tool.id}</small><h3>${escapeHtml(tool.name)}</h3><p>${escapeHtml(tool.description || '')}</p></div><div class="actions"><a class="button button-glass" href="/tools/${tool.id}" data-link>查看</a><button class="button button-glass" data-tool-delete="${tool.id}">删除</button></div></article>`).join('')
   return layout('工具管理', '管理独立 HTML 工具及其可见性。', `<section class="glass-card editor-card" data-tool-form><label for="tool-name">名称</label><input id="tool-name" name="name" required><label for="tool-description">说明</label><input id="tool-description" name="description"><label for="tool-source">来源</label><input id="tool-source" name="source"><label for="tool-html">HTML 代码</label><textarea id="tool-html" name="html_content" rows="12" required></textarea><label for="tool-visibility">可见等级</label><select id="tool-visibility" name="visibility"><option value="0">所有人</option><option value="1" selected>登录用户</option><option value="2">作者</option><option value="3">管理员</option><option value="4">超级管理员</option></select><button class="button button-primary" type="button" data-tool-save>添加工具</button><p class="form-status" data-form-status></p></section><section class="admin-list">${cards || '<div class="glass-card empty-state"><p>还没有工具。</p></div>'}</section>`)
+}
+
+async function renderSections() {
+  const sections = (await api('/sections')).sections
+  const cards = sections.map((section) => `<article class="glass-card admin-row"><div><small>SECTION #${section.id}</small><h3>${escapeHtml(section.name)}</h3><p>${escapeHtml(section.description || '')} · ${section.article_count} 篇文章</p></div><div class="actions"><button class="button button-glass" data-section-edit="${section.id}" data-section-name="${escapeHtml(section.name)}" data-section-description="${escapeHtml(section.description || '')}">编辑</button><button class="button button-glass" data-section-delete="${section.id}">删除</button></div></article>`).join('')
+  return layout('板块管理', '创建独立板块，文章可以归属到对应板块。', `<section class="glass-card editor-card" data-section-form><label for="section-name">名称</label><input id="section-name" name="name" maxlength="80" required><label for="section-description">描述</label><input id="section-description" name="description" maxlength="300"><button class="button button-primary" type="button" data-section-save>添加板块</button><p class="form-status" data-form-status></p></section><section class="admin-list">${cards || '<div class="glass-card empty-state"><p>暂无板块。</p></div>'}</section>`)
 }
 
 async function renderLogs() {

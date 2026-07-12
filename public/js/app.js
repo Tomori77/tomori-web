@@ -16,7 +16,7 @@ function escapeHtml(value) {
 }
 
 async function updateNavigation(user) {
-  let navItems = [{ label: '首页', path: '/' }, { label: '工具', path: '/tools' }]
+  let navItems = [{ label: '首页', path: '/' }, { label: '文章', path: '/articles' }, { label: '工具', path: '/tools' }]
   try {
     navItems = (await api('/settings/nav_items')).nav_items
       .filter((item) => item && typeof item.label === 'string' && typeof item.path === 'string' && item.path.startsWith('/') && !item.path.startsWith('//'))
@@ -108,6 +108,19 @@ async function bindPageActions() {
 
   const articleForm = document.querySelector('[data-article-form]')
   if (articleForm) {
+    const preview = articleForm.querySelector('[data-article-preview]')
+    const contentField = articleForm.querySelector('[name="content"]')
+    const updatePreview = () => {
+      if (!preview || !contentField) return
+      const safe = String(contentField.value)
+        .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        .replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>')
+      preview.innerHTML = safe ? `<p>${safe}</p>` : '<p class="preview-empty">开始输入，右侧会显示预览。</p>'
+    }
+    contentField?.addEventListener('input', updatePreview)
+    updatePreview()
     articleForm.addEventListener('submit', async (event) => {
       event.preventDefault()
       const form = Object.fromEntries(new FormData(articleForm))
@@ -165,6 +178,14 @@ async function bindPageActions() {
     })
   })
 
+  const searchForm = document.querySelector('[data-article-search]')
+  searchForm?.addEventListener('submit', (event) => {
+    event.preventDefault()
+    const query = new FormData(searchForm).get('q')?.toString().trim() || ''
+    window.history.pushState({}, '', `/articles${query ? `?q=${encodeURIComponent(query)}` : ''}`)
+    render()
+  })
+
   document.querySelectorAll('[data-review-action]').forEach((button) => {
     button.addEventListener('click', async () => {
       const id = button.dataset.articleId
@@ -201,6 +222,44 @@ async function bindPageActions() {
       if (!window.confirm('确定删除这个工具吗？')) return
       try {
         await api(`/tools/${button.dataset.toolDelete}`, { method: 'DELETE' })
+        render()
+      } catch (error) {
+        showFormError(error.message)
+      }
+    })
+  })
+
+  document.querySelector('[data-section-save]')?.addEventListener('click', async () => {
+    const form = document.querySelector('[data-section-form]')
+    const fields = Object.fromEntries(new FormData(form))
+    try {
+      await api('/sections', { method: 'POST', body: JSON.stringify(fields) })
+      render()
+    } catch (error) {
+      showFormError(error.message)
+    }
+  })
+
+  document.querySelectorAll('[data-section-edit]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const name = window.prompt('板块名称', button.dataset.sectionName)
+      if (name === null) return
+      const description = window.prompt('板块描述', button.dataset.sectionDescription || '')
+      if (description === null) return
+      try {
+        await api(`/sections/${button.dataset.sectionEdit}`, { method: 'PUT', body: JSON.stringify({ name, description }) })
+        render()
+      } catch (error) {
+        showFormError(error.message)
+      }
+    })
+  })
+
+  document.querySelectorAll('[data-section-delete]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      if (!window.confirm('删除板块后，文章会变为未分类。确定继续吗？')) return
+      try {
+        await api(`/sections/${button.dataset.sectionDelete}`, { method: 'DELETE' })
         render()
       } catch (error) {
         showFormError(error.message)

@@ -19,10 +19,22 @@ userRoutes.get('/me/articles', authMiddleware, async (c) => {
   }
   params.push(limit, offset)
   const result = await c.env.DB.prepare(
-    `SELECT id, title, slug, excerpt, status, visibility, rejected_reason, created_at, updated_at
-     FROM articles WHERE author_id = ?${statusClause} ORDER BY updated_at DESC LIMIT ? OFFSET ?`
+    `SELECT a.id, a.title, a.slug, a.excerpt, a.status, a.visibility, a.rejected_reason,
+            a.section_id, a.tags, s.name AS section_name, s.slug AS section_slug,
+            a.created_at, a.updated_at
+     FROM articles a LEFT JOIN sections s ON s.id = a.section_id
+     WHERE a.author_id = ?${statusClause.replace('status', 'a.status')} ORDER BY a.updated_at DESC LIMIT ? OFFSET ?`
   ).bind(...params).all()
-  return c.json({ articles: result.results, limit, offset })
+  return c.json({
+    articles: result.results.map((article) => ({
+      ...article,
+      tags: (() => {
+        try { return JSON.parse(String(article.tags || '[]')) } catch { return [] }
+      })()
+    })),
+    limit,
+    offset
+  })
 })
 
 userRoutes.put('/me', authMiddleware, async (c) => {

@@ -13,6 +13,7 @@ import { admin } from './router/admin'
 import { settings } from './router/settings'
 import { tools } from './router/tools'
 import { pageRoutes } from './router/placeholder'
+import { sections } from './router/sections'
 
 const app = new Hono<AppContext>()
 
@@ -44,6 +45,7 @@ app.route('/api/tools', tools)
 app.route('/api/admin/tools', tools)
 app.route('/api/pages', pageRoutes)
 app.route('/api/settings', settings)
+app.route('/api/sections', sections)
 
 app.get('/files/*', async (c) => {
   const key = c.req.path.slice('/files/'.length)

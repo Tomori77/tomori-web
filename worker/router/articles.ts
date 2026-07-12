@@ -17,6 +17,10 @@ type Article = {
   excerpt: string | null
   author_id: number
   author_username?: string
+  section_id: number | null
+  section_name?: string | null
+  section_slug?: string | null
+  tags: string
   status: 'draft' | 'pending' | 'published' | 'rejected'
   visibility: number
   rejected_reason: string | null
@@ -60,6 +64,19 @@ function validVisibility(value: unknown) {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 4
 }
 
+function parseTags(value: unknown) {
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',')
+      : []
+  return [...new Set(values.map((tag) => String(tag).trim().toLowerCase()).filter((tag) => /^[\p{L}\p{N}_-]{1,32}$/u.test(tag)))].slice(0, 20)
+}
+
+function tagsJson(value: unknown) {
+  return JSON.stringify(parseTags(value))
+}
+
 function publicArticle(article: Article) {
   return {
     id: article.id,
@@ -68,6 +85,10 @@ function publicArticle(article: Article) {
     excerpt: article.excerpt,
     author_id: article.author_id,
     author_username: article.author_username,
+    section_id: article.section_id,
+    section_name: article.section_name,
+    section_slug: article.section_slug,
+    tags: parseTags(article.tags),
     status: article.status,
     visibility: article.visibility,
     rejected_reason: article.rejected_reason,
@@ -81,15 +102,23 @@ articles.get('/', async (c) => {
   const role = user?.role ?? 0
   const limit = Math.min(Math.max(Number(c.req.query('limit') || 20), 1), 50)
   const offset = Math.max(Number(c.req.query('offset') || 0), 0)
+  const search = (c.req.query('q') || '').trim()
+  const searchClause = search ? ' AND (a.title LIKE ? OR s.name LIKE ? OR s.slug LIKE ? OR a.tags LIKE ?)' : ''
+  const searchValue = `%${search.replace(/[\\%_]/g, '\\$&')}%`
+  const params: (string | number)[] = [role]
+  if (search) params.push(searchValue, searchValue, searchValue, searchValue)
+  params.push(limit, offset)
   const result = await c.env.DB.prepare(
     `SELECT a.id, a.title, a.slug, a.excerpt, a.author_id, u.username AS author_username,
-            a.status, a.visibility, a.rejected_reason, a.created_at, a.updated_at
+            a.status, a.visibility, a.rejected_reason, a.section_id, a.tags,
+            s.name AS section_name, s.slug AS section_slug, a.created_at, a.updated_at
      FROM articles a LEFT JOIN users u ON u.id = a.author_id
-     WHERE a.status = 'published' AND a.visibility <= ?
+     LEFT JOIN sections s ON s.id = a.section_id
+     WHERE a.status = 'published' AND a.visibility <= ?${searchClause}
      ORDER BY a.created_at DESC LIMIT ? OFFSET ?`
-  ).bind(role, limit, offset).all<Article>()
+  ).bind(...params).all<Article>()
 
-  return c.json({ articles: result.results.map(publicArticle), limit, offset })
+  return c.json({ articles: result.results.map(publicArticle), limit, offset, q: search })
 })
 
 articles.get('/:id', async (c) => {
@@ -99,15 +128,22 @@ articles.get('/:id', async (c) => {
   if (!isId && !/^[a-z0-9][a-z0-9-]*$/i.test(identifier)) return c.json({ error: 'Invalid article identifier' }, 400)
   const user = await optionalUser(c)
   const article = await c.env.DB.prepare(
-    `SELECT a.*, u.username AS author_username
-     FROM articles a LEFT JOIN users u ON u.id = a.author_id WHERE ${isId ? 'a.id = ?' : 'a.slug = ?'}`
+    `SELECT a.*, u.username AS author_username, s.name AS section_name, s.slug AS section_slug
+     FROM articles a LEFT JOIN users u ON u.id = a.author_id
+     LEFT JOIN sections s ON s.id = a.section_id
+     WHERE ${isId ? 'a.id = ?' : 'a.slug = ?'}`
   ).bind(isId ? id : identifier).first<Article>()
   if (!article) return c.json({ error: 'Article not found' }, 404)
 
   const canRead = article.status === 'published' && article.visibility <= (user?.role ?? 0)
   const canManage = Boolean(user && (user.role >= 3 || user.id === article.author_id))
   if (!canRead && !canManage) return c.json({ error: 'Forbidden' }, 403)
-  return c.json({ article: { ...article, content: article.content } })
+  return c.json({
+    article: {
+      ...article,
+      tags: parseTags(article.tags)
+    }
+  })
 })
 
 articles.post('/', rateLimit({ limit: 20, windowMs: 60 * 60_000 }), authMiddleware, requireRole(2), async (c) => {
@@ -117,18 +153,21 @@ articles.post('/', rateLimit({ limit: 20, windowMs: 60 * 60_000 }), authMiddlewa
   const content = typeof body?.content === 'string' ? body.content : ''
   const excerpt = body?.excerpt === undefined || body.excerpt === null ? null : String(body.excerpt).trim()
   const visibility = body?.visibility === undefined ? 1 : body.visibility
+  const sectionId = body?.section_id === undefined || body.section_id === null || body.section_id === '' ? null : Number(body.section_id)
+  const tags = tagsJson(body?.tags)
   if (!title || title.length > 200) return c.json({ error: 'Title is required and must be at most 200 characters' }, 400)
   if (!content) return c.json({ error: 'Content is required' }, 400)
   if (new TextEncoder().encode(content).length > ARTICLE_MAX_SIZE) return c.json({ error: 'Article content exceeds 256 KB' }, 413)
   const contentError = validateMarkdownContent(content)
   if (contentError) return c.json({ error: contentError }, 400)
   if (!validVisibility(visibility)) return c.json({ error: 'Visibility must be between 0 and 4' }, 400)
+  if (sectionId !== null && (!Number.isInteger(sectionId) || sectionId < 1 || !(await c.env.DB.prepare('SELECT id FROM sections WHERE id = ?').bind(sectionId).first()))) return c.json({ error: 'Section not found' }, 400)
 
   const slug = await uniqueSlug(c, title)
   const result = await c.env.DB.prepare(
-    `INSERT INTO articles (title, slug, content, excerpt, author_id, visibility)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).bind(title, slug, content, excerpt, user.id, visibility).run()
+    `INSERT INTO articles (title, slug, content, excerpt, author_id, visibility, section_id, tags)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(title, slug, content, excerpt, user.id, visibility, sectionId, tags).run()
   const article = await c.env.DB.prepare('SELECT * FROM articles WHERE id = ?')
     .bind(result.meta.last_row_id).first<Article>()
   return c.json({ article }, 201)
@@ -146,17 +185,20 @@ articles.put('/:id', rateLimit({ limit: 20, windowMs: 60 * 60_000 }), authMiddle
   const content = body?.content === undefined ? current.content : String(body.content)
   const excerpt = body?.excerpt === undefined ? current.excerpt : body.excerpt === null ? null : String(body.excerpt).trim()
   const visibility = body?.visibility === undefined ? current.visibility : body.visibility
+  const sectionId = body?.section_id === undefined ? current.section_id : body.section_id === null || body.section_id === '' ? null : Number(body.section_id)
+  const tags = body?.tags === undefined ? current.tags : tagsJson(body.tags)
   if (!title || title.length > 200) return c.json({ error: 'Title is required and must be at most 200 characters' }, 400)
   if (new TextEncoder().encode(content).length > ARTICLE_MAX_SIZE) return c.json({ error: 'Article content exceeds 256 KB' }, 413)
   const contentError = validateMarkdownContent(content)
   if (contentError) return c.json({ error: contentError }, 400)
   if (!validVisibility(visibility)) return c.json({ error: 'Visibility must be between 0 and 4' }, 400)
+  if (sectionId !== null && (!Number.isInteger(sectionId) || sectionId < 1 || !(await c.env.DB.prepare('SELECT id FROM sections WHERE id = ?').bind(sectionId).first()))) return c.json({ error: 'Section not found' }, 400)
 
   const slug = title === current.title ? current.slug : await uniqueSlug(c, title, id)
   await c.env.DB.prepare(
-    `UPDATE articles SET title = ?, slug = ?, content = ?, excerpt = ?, visibility = ?, updated_at = datetime('now')
+    `UPDATE articles SET title = ?, slug = ?, content = ?, excerpt = ?, visibility = ?, section_id = ?, tags = ?, updated_at = datetime('now')
      WHERE id = ?`
-  ).bind(title, slug, content, excerpt, visibility, id).run()
+  ).bind(title, slug, content, excerpt, visibility, sectionId, tags, id).run()
   const article = await c.env.DB.prepare('SELECT * FROM articles WHERE id = ?').bind(id).first<Article>()
   return c.json({ article })
 })

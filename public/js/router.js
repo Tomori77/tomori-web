@@ -1,5 +1,7 @@
 const routes = [
   { pattern: /^\/$/, render: () => import('./pages/home.js'), auth: 0 },
+  { pattern: /^\/articles\/?$/, render: () => import('./pages/articles.js'), auth: 0 },
+  { pattern: /^\/sections\/[^/]+\/?$/, render: () => import('./pages/section.js'), auth: 0 },
   { pattern: /^\/article\/[^/]+\/?$/, render: () => import('./pages/article.js'), auth: 0 },
   { pattern: /^\/login\/?$/, render: () => import('./pages/login.js'), auth: 0 },
   { pattern: /^\/register\/?$/, render: () => import('./pages/register.js'), auth: 0 },

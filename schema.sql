@@ -24,6 +24,18 @@ CREATE TABLE IF NOT EXISTS articles (
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'pending', 'published', 'rejected')),
   visibility INTEGER NOT NULL DEFAULT 1 CHECK (visibility BETWEEN 0 AND 4),
   rejected_reason TEXT,
+  section_id INTEGER REFERENCES sections(id),
+  tags TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL UNIQUE,
+  description TEXT,
+  created_by INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -74,7 +86,7 @@ CREATE INDEX IF NOT EXISTS idx_tools_visibility ON tools(visibility);
 
 INSERT OR IGNORE INTO settings (key, value, description)
 VALUES
-  ('nav_items', '[{"label":"首页","path":"/","icon":"home"},{"label":"工具","path":"/tools","icon":"grid"}]', '公开导航菜单'),
+  ('nav_items', '[{"label":"首页","path":"/","icon":"home"},{"label":"文章","path":"/articles","icon":"book"},{"label":"工具","path":"/tools","icon":"grid"}]', '公开导航菜单'),
   ('site_title', 'Tomori Web', '网站标题'),
   ('site_description', '轻量、开放的内容社区', '网站描述'),
   ('upload_max_size', '2097152', '上传大小限制，单位为字节'),

@@ -21,6 +21,8 @@ npm run dev
 - `GET /api/auth/me` 获取当前登录用户。
 - `PUT /api/users/me` 更新当前用户资料。
 - `GET /api/articles` 获取公开文章列表，`GET /api/articles/:id-or-slug` 获取文章详情。
+- `GET /api/sections` 获取板块列表，`GET /api/sections/:slug` 获取板块文章。
+- `GET /api/articles?q=...` 按文章标题、板块名称/slug 和 tags 搜索。
 - `POST /api/articles`、`PUT /api/articles/:id`、`POST /api/articles/:id/submit` 管理作者文章。
 - `GET /api/users/me/articles` 获取自己的文章列表，可按状态筛选。
 - `GET /api/admin/articles/pending`、`PUT /api/admin/articles/:id/review` 管理文章审核。
