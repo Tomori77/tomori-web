@@ -1,0 +1,17 @@
+name = "tomori-web"
+main = "worker/index.ts"
+compatibility_date = "2026-07-12"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tomori-web-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "./migrations"
+
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "tomori-web-media"

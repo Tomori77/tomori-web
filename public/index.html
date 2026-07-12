@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Tomori Web 轻量内容社区">
+    <title>Tomori Web</title>
+    <link rel="stylesheet" href="/css/style.css">
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="/" data-link>
+        <span class="brand-mark">T</span>
+        <span>Tomori Web</span>
+      </a>
+      <button class="menu-toggle" type="button" aria-label="打开导航" aria-expanded="false">☰</button>
+      <nav class="site-nav" aria-label="主导航">
+        <a href="/" data-link>首页</a>
+        <a href="/tools" data-link>工具</a>
+        <a href="/login" data-link>登录</a>
+        <a class="nav-action" href="/register" data-link>注册</a>
+      </nav>
+    </header>
+
+    <main id="app" class="page-shell" tabindex="-1"></main>
+
+    <footer class="site-footer">
+      <span>Tomori Web</span>
+      <span>阶段 1 · 项目骨架</span>
+    </footer>
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>
