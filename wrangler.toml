@@ -9,9 +9,9 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "tomori-web-db"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "2c0117d3-a13c-4dae-98b5-c5a19966a184"
 migrations_dir = "./migrations"
 
 [[r2_buckets]]
 binding = "MEDIA_BUCKET"
-bucket_name = "tomori-web-media"
+bucket_name = "tomori-web-articles"
