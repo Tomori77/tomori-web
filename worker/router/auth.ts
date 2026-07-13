@@ -23,8 +23,18 @@ function publicUser(user: AuthUser) {
     email: user.email,
     role: user.role,
     avatar_url: user.avatar_url,
-    bio: user.bio
+    bio: user.bio,
+    announcement_unread_count: user.announcement_unread_count || 0,
+    article_notification_unread_count: user.article_notification_unread_count || 0
   }
+}
+
+async function withAnnouncementCount(c: Context<AppContext>, user: AuthUser) {
+  const result = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS count FROM announcements WHERE user_id = ? AND read_at IS NULL'
+  ).bind(user.id).first<{ count: number }>()
+  const notifications = await c.env.DB.prepare('SELECT COUNT(*) AS count FROM article_notifications WHERE user_id = ? AND read_at IS NULL').bind(user.id).first<{ count: number }>()
+  return { ...user, announcement_unread_count: result?.count || 0, article_notification_unread_count: notifications?.count || 0 }
 }
 
 authRoutes.post('/register', async (c) => {
@@ -45,17 +55,18 @@ authRoutes.post('/register', async (c) => {
   if (existing) return c.json({ error: existing.username === username ? 'Username is already in use' : 'Email is already in use' }, 409)
 
   const passwordHash = hashSync(password, 12)
-  const role = c.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase() === email ? 4 : 1
+  const role = 1
   const result = await c.env.DB.prepare(
-    'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)'
+    "INSERT INTO users (username, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, datetime('now', '+8 hours'), datetime('now', '+8 hours'))"
   ).bind(username, email, passwordHash, role).run()
   const user = await c.env.DB.prepare(
     'SELECT id, username, email, role, avatar_url, bio FROM users WHERE id = ?'
   ).bind(result.meta.last_row_id).first<AuthUser>()
 
   if (!user) return c.json({ error: 'Unable to create user' }, 500)
-  const token = await createToken(c.env, user)
-  return c.json({ user: publicUser(user), token }, 201)
+  const sessionUser = await withAnnouncementCount(c, user)
+  const token = await createToken(c.env, sessionUser)
+  return c.json({ user: publicUser(sessionUser), token }, 201)
 })
 
 authRoutes.post('/login', async (c) => {
@@ -71,10 +82,14 @@ authRoutes.post('/login', async (c) => {
     return c.json({ error: 'Invalid email or password' }, 401)
   }
 
-  const token = await createToken(c.env, user)
-  return c.json({ user: publicUser(user), token })
+  const sessionUser = await withAnnouncementCount(c, user)
+  const token = await createToken(c.env, sessionUser)
+  return c.json({ user: publicUser(sessionUser), token })
 })
 
-authRoutes.get('/me', authMiddleware, (c) => c.json({ user: publicUser(c.get('user')) }))
+authRoutes.get('/me', authMiddleware, async (c) => {
+  const user = await withAnnouncementCount(c, c.get('user'))
+  return c.json({ user: publicUser(user) })
+})
 
 export { authRoutes }

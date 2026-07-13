@@ -28,7 +28,7 @@ async function loadArticles() {
     const articleContent = articles.length
       ? articles.map(articleCard).join('')
       : '<div class="glass-card empty-state"><h3>暂无文章</h3><p>没有找到符合条件的文章。</p></div>'
-    return `<section class="section-heading"><p class="eyebrow">Reading room</p><h2>文章</h2><p>按板块浏览内容，或搜索标题、板块和 tags。</p><form class="search-bar" data-article-search><input name="q" value="${escapeHtml(q)}" placeholder="搜索文章名称、板块、tags" aria-label="搜索文章名称、板块、tags"><button class="button button-primary" type="submit">搜索</button></form></section><section><div class="content-section-title"><h3>所有板块</h3></div><div class="section-grid">${sectionCards}</div></section><section class="article-results"><div class="content-section-title"><h3>${q ? `搜索结果：${escapeHtml(q)}` : '全部文章'}</h3></div><div class="article-grid">${articleContent}</div></section>`
+    return `<section class="section-heading"><p class="eyebrow">Reading room</p><h2>文章</h2><p>按板块浏览内容，输入一个或多个关键词搜索标题、板块和 tags。</p><form class="search-bar" data-article-search><input name="q" value="${escapeHtml(q)}" placeholder="输入关键词，用空格分隔" aria-label="文章关键词搜索"><button class="button button-primary" type="submit">搜索</button></form></section><section><div class="content-section-title"><h3>所有板块</h3></div><div class="section-grid">${sectionCards}</div></section><section class="article-results"><div class="content-section-title"><h3>${q ? `搜索结果：${escapeHtml(q)}` : '全部文章'}</h3></div><div class="article-grid">${articleContent}</div></section>`
   } catch (error) {
     return `<section class="glass-card"><p class="form-status">${escapeHtml(error.message)}</p></section>`
   }

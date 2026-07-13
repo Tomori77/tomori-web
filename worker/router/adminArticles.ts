@@ -22,17 +22,24 @@ adminArticles.put('/articles/:id/review', rateLimit({ limit: 100, windowMs: 60 *
   if (!['approve', 'reject'].includes(String(action))) return c.json({ error: 'Action must be approve or reject' }, 400)
   if (action === 'reject' && !reason) return c.json({ error: 'A rejection reason is required' }, 400)
 
-  const article = await c.env.DB.prepare('SELECT id, status FROM articles WHERE id = ?').bind(id).first<{ id: number; status: string }>()
+  const article = await c.env.DB.prepare('SELECT id, title, author_id, status FROM articles WHERE id = ?').bind(id).first<{ id: number; title: string; author_id: number | null; status: string }>()
   if (!article) return c.json({ error: 'Article not found' }, 404)
   if (article.status !== 'pending') return c.json({ error: 'Only pending articles can be reviewed' }, 409)
 
   const status = action === 'approve' ? 'published' : 'rejected'
   await c.env.DB.prepare(
-    "UPDATE articles SET status = ?, rejected_reason = ?, updated_at = datetime('now') WHERE id = ?"
+    "UPDATE articles SET status = ?, rejected_reason = ?, updated_at = datetime('now', '+8 hours') WHERE id = ?"
   ).bind(status, action === 'reject' ? reason : null, id).run()
-  await c.env.DB.prepare(
-    'INSERT INTO audit_logs (action, target_id, operator_id, detail) VALUES (?, ?, ?, ?)'
-  ).bind('article_review', id, c.get('user').id, JSON.stringify({ status, reason })).run()
+  const notificationMessage = status === 'published'
+    ? `你的文章《${article.title}》已通过审核并发布。`
+    : `你的文章《${article.title}》未通过审核。${reason ? `原因：${reason}` : ''}`
+  const statements = [
+    c.env.DB.prepare("INSERT INTO audit_logs (action, target_id, operator_id, detail, created_at) VALUES (?, ?, ?, ?, datetime('now', '+8 hours'))").bind('article_review', id, c.get('user').id, JSON.stringify({ status, reason })),
+  ]
+  if (article.author_id) {
+    statements.push(c.env.DB.prepare("INSERT INTO article_notifications (user_id, title, message, notification_type, article_ids, created_at) VALUES (?, ?, ?, 'review', ?, datetime('now', '+8 hours'))").bind(article.author_id, status === 'published' ? '文章审核通过' : '文章审核未通过', notificationMessage, JSON.stringify([id])))
+  }
+  await c.env.DB.batch(statements)
   return c.json({ status, reason: action === 'reject' ? reason : null })
 })
 

@@ -42,7 +42,7 @@ uploadRoutes.post('/', rateLimit({ limit: 30, windowMs: 60 * 60_000 }), authMidd
     httpMetadata: { contentType: fileEntry.type }
   })
   await c.env.DB.prepare(
-    'INSERT INTO media (user_id, filename, r2_key, size, mime_type) VALUES (?, ?, ?, ?, ?)'
+    "INSERT INTO media (user_id, filename, r2_key, size, mime_type, uploaded_at) VALUES (?, ?, ?, ?, ?, datetime('now', '+8 hours'))"
   ).bind(c.get('user').id, fileEntry.name, key, fileEntry.size, fileEntry.type).run()
 
   return c.json({ url: `/files/${key}`, key, filename: fileEntry.name, size: fileEntry.size, mime_type: fileEntry.type }, 201)

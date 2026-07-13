@@ -20,4 +20,6 @@ export interface AuthUser {
   role: number
   avatar_url: string | null
   bio: string | null
+  announcement_unread_count?: number
+  article_notification_unread_count?: number
 }

@@ -58,10 +58,10 @@ async function createTool(c: Context<AppContext>) {
   if (!validVisibility(tool.visibility)) return c.json({ error: 'Visibility must be between 0 and 4' }, 400)
 
   const result = await c.env.DB.prepare(
-    'INSERT INTO tools (name, description, source, html_content, visibility, created_by) VALUES (?, ?, ?, ?, ?, ?)'
+    "INSERT INTO tools (name, description, source, html_content, visibility, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now', '+8 hours'), datetime('now', '+8 hours'))"
   ).bind(tool.name, tool.description, tool.source, tool.htmlContent, tool.visibility, c.get('user').id).run()
   await c.env.DB.prepare(
-    'INSERT INTO audit_logs (action, target_id, operator_id, detail) VALUES (?, ?, ?, ?)'
+    "INSERT INTO audit_logs (action, target_id, operator_id, detail, created_at) VALUES (?, ?, ?, ?, datetime('now', '+8 hours'))"
   ).bind('tool_create', result.meta.last_row_id, c.get('user').id, JSON.stringify({ name: tool.name })).run()
   return c.json({ id: result.meta.last_row_id }, 201)
 }
@@ -80,10 +80,10 @@ async function updateTool(c: Context<AppContext>) {
   if (!validVisibility(tool.visibility)) return c.json({ error: 'Visibility must be between 0 and 4' }, 400)
 
   await c.env.DB.prepare(
-    "UPDATE tools SET name = ?, description = ?, source = ?, html_content = ?, visibility = ?, updated_at = datetime('now') WHERE id = ?"
+    "UPDATE tools SET name = ?, description = ?, source = ?, html_content = ?, visibility = ?, updated_at = datetime('now', '+8 hours') WHERE id = ?"
   ).bind(tool.name, tool.description, tool.source, tool.htmlContent, tool.visibility, id).run()
   await c.env.DB.prepare(
-    'INSERT INTO audit_logs (action, target_id, operator_id, detail) VALUES (?, ?, ?, ?)'
+    "INSERT INTO audit_logs (action, target_id, operator_id, detail, created_at) VALUES (?, ?, ?, ?, datetime('now', '+8 hours'))"
   ).bind('tool_update', id, c.get('user').id, JSON.stringify({ name: tool.name })).run()
   return c.json({ ok: true })
 }
@@ -96,7 +96,7 @@ async function deleteTool(c: Context<AppContext>) {
   if (!existing) return c.json({ error: 'Tool not found' }, 404)
   await c.env.DB.prepare('DELETE FROM tools WHERE id = ?').bind(id).run()
   await c.env.DB.prepare(
-    'INSERT INTO audit_logs (action, target_id, operator_id, detail) VALUES (?, ?, ?, ?)'
+    "INSERT INTO audit_logs (action, target_id, operator_id, detail, created_at) VALUES (?, ?, ?, ?, datetime('now', '+8 hours'))"
   ).bind('tool_delete', id, c.get('user').id, null).run()
   return c.body(null, 204)
 }
